@@ -542,6 +542,13 @@ class json_sax_dom_callback_parser
 
     bool start_object(std::size_t len)
     {
+#if JSON_DIAGNOSTIC_POSITIONS
+        if (m_lexer_ref) {
+            discarded.end_position = m_lexer_ref->get_position();
+            discarded.start_position = discarded.end_position - 1;
+        }
+#endif
+
         // check callback for object start
         const bool keep = callback(static_cast<int>(ref_stack.size()), parse_event_t::object_start, discarded);
         keep_stack.push_back(keep);
@@ -559,6 +566,7 @@ class json_sax_dom_callback_parser
             {
                 // Lexer has read the first character of the object, so
                 // subtract 1 from the position to get the correct start position.
+                ref_stack.back()->end_position = m_lexer_ref->get_position();
                 ref_stack.back()->start_position = m_lexer_ref->get_position() - 1;
             }
 #endif
@@ -575,6 +583,10 @@ class json_sax_dom_callback_parser
     bool key(string_t& val)
     {
         BasicJsonType k = BasicJsonType(val);
+
+#if JSON_DIAGNOSTIC_POSITIONS
+        handle_diagnostic_positions_for_json_value(k);
+#endif
 
         // check callback for key
         const bool keep = callback(static_cast<int>(ref_stack.size()), parse_event_t::key, k);
@@ -593,6 +605,15 @@ class json_sax_dom_callback_parser
     {
         if (ref_stack.back())
         {
+#if JSON_DIAGNOSTIC_POSITIONS
+            if (m_lexer_ref)
+            {
+                // Lexer's position is past the closing brace, so set that as the end position.
+                ref_stack.back()->end_position = m_lexer_ref->get_position();
+                ref_stack.back()->start_position = m_lexer_ref->get_position() - 1;
+            }
+#endif
+
             if (!callback(static_cast<int>(ref_stack.size()) - 1, parse_event_t::object_end, *ref_stack.back()))
             {
                 // discard object
@@ -605,15 +626,6 @@ class json_sax_dom_callback_parser
             }
             else
             {
-
-#if JSON_DIAGNOSTIC_POSITIONS
-                if (m_lexer_ref)
-                {
-                    // Lexer's position is past the closing brace, so set that as the end position.
-                    ref_stack.back()->end_position = m_lexer_ref->get_position();
-                }
-#endif
-
                 ref_stack.back()->set_parents();
             }
         }
@@ -641,6 +653,13 @@ class json_sax_dom_callback_parser
 
     bool start_array(std::size_t len)
     {
+#if JSON_DIAGNOSTIC_POSITIONS
+        if (m_lexer_ref) {
+            discarded.end_position = m_lexer_ref->get_position();
+            discarded.start_position = discarded.end_position - 1;
+        }
+#endif
+
         const bool keep = callback(static_cast<int>(ref_stack.size()), parse_event_t::array_start, discarded);
         keep_stack.push_back(keep);
 
@@ -677,18 +696,18 @@ class json_sax_dom_callback_parser
 
         if (ref_stack.back())
         {
+#if JSON_DIAGNOSTIC_POSITIONS
+            if (m_lexer_ref)
+            {
+                // Lexer's position is past the closing bracket, so set that as the end position.
+                ref_stack.back()->start_position = m_lexer_ref->get_position() - 1;
+                ref_stack.back()->end_position = m_lexer_ref->get_position();
+            }
+#endif
+
             keep = callback(static_cast<int>(ref_stack.size()) - 1, parse_event_t::array_end, *ref_stack.back());
             if (keep)
             {
-
-#if JSON_DIAGNOSTIC_POSITIONS
-                if (m_lexer_ref)
-                {
-                    // Lexer's position is past the closing bracket, so set that as the end position.
-                    ref_stack.back()->end_position = m_lexer_ref->get_position();
-                }
-#endif
-
                 ref_stack.back()->set_parents();
             }
             else
